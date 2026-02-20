@@ -18,8 +18,8 @@ test_extraction.py
 types.txt
 
 # CLI dev tools (not needed for API deployment)
-main.py
-ingest.py
+/main.py
+/ingest.py
 
 # OS
 .DS_Store
