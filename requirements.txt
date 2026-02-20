@@ -1,0 +1,13 @@
+qdrant-client
+ollama
+python-dotenv
+pydantic
+pydantic-settings
+requests
+httpx
+fastapi
+uvicorn[standard]
+langchain-text-splitters
+tiktoken
+pymupdf
+numpy

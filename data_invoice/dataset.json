@@ -1,0 +1,198 @@
+[
+    {
+        "doc_id": "invoice_001",
+        "doc_type": "invoice",
+        "invoice_number": "INV-TN-2025-1215",
+        "invoice_date": "2025-12-15",
+        "financial_year": "2025-2026",
+        "supplier": {
+            "legal_name": "JK MOTORS",
+            "gstin": "33AAKFJ6466F1Z8",
+            "state": "Tamil Nadu"
+        },
+        "recipient": {
+            "legal_name": "DEEPAK RAJ N",
+            "customer_id": "CUST-1023",
+            "state": "Tamil Nadu"
+        },
+        "items": [
+            {
+                "description": "Engine Oil",
+                "quantity": 3,
+                "rate": 1100,
+                "total": 3300
+            },
+            {
+                "description": "Brake Pads",
+                "quantity": 2,
+                "rate": 1400,
+                "total": 2800
+            }
+        ],
+        "subtotal": 6100,
+        "gst_percent": 18,
+        "gst_amount": 1098,
+        "grand_total": 7198,
+        "payment_status": "Paid"
+    },
+    {
+        "doc_id": "invoice_002",
+        "doc_type": "invoice",
+        "invoice_number": "INV-TN-2026-0215",
+        "invoice_date": "2026-02-15",
+        "financial_year": "2025-2026",
+        "supplier": {
+            "legal_name": "JK MOTORS",
+            "gstin": "33AAKFJ6466F1Z8",
+            "state": "Tamil Nadu"
+        },
+        "recipient": {
+            "legal_name": "DEEPAK RAJ N",
+            "customer_id": "CUST-1023",
+            "state": "Tamil Nadu"
+        },
+        "items": [
+            {
+                "description": "Clutch Plate",
+                "quantity": 1,
+                "rate": 3500,
+                "total": 3500
+            },
+            {
+                "description": "Oil Filter",
+                "quantity": 4,
+                "rate": 500,
+                "total": 2000
+            }
+        ],
+        "subtotal": 5500,
+        "gst_percent": 18,
+        "gst_amount": 990,
+        "grand_total": 6490,
+        "payment_status": "Unpaid"
+    },
+    {
+        "doc_id": "medical_001",
+        "doc_type": "medical",
+        "patient_name": "Ravi Kumar",
+        "age": 45,
+        "gender": "Male",
+        "report_date": "2026-01-10",
+        "hospital": "Chennai Medical Center",
+        "doctor": "Dr. Meena Sharma",
+        "diagnosis": "Stage 1 Hypertension",
+        "lab_results": {
+            "blood_pressure": "150/95 mmHg",
+            "cholesterol": "220 mg/dL",
+            "fasting_blood_sugar": "110 mg/dL"
+        },
+        "prescription": [
+            "Amlodipine 5mg – Once daily",
+            "Low salt diet",
+            "Follow-up in 1 month"
+        ],
+        "follow_up_required": true
+    },
+    {
+        "doc_id": "medical_002",
+        "doc_type": "medical",
+        "patient_name": "Anita Sharma",
+        "age": 38,
+        "gender": "Female",
+        "report_date": "2026-02-20",
+        "hospital": "Apollo Diagnostics",
+        "doctor": "Dr. Rajesh Nair",
+        "diagnosis": "Type 2 Diabetes",
+        "lab_results": {
+            "fasting_blood_sugar": "165 mg/dL",
+            "postprandial_sugar": "240 mg/dL",
+            "hba1c": "7.8%"
+        },
+        "prescription": [
+            "Metformin 500mg – Twice daily",
+            "Diet control",
+            "Exercise 30 minutes daily"
+        ],
+        "follow_up_required": true
+    },
+    {
+        "doc_id": "hr_001",
+        "doc_type": "hr",
+        "title": "Leave Policy 2025",
+        "effective_date": "2025-01-01",
+        "organization": "ABC Pvt Ltd",
+        "sections": [
+            {
+                "heading": "Casual Leave",
+                "content": "Employees are entitled to 10 days of casual leave per year."
+            },
+            {
+                "heading": "Sick Leave",
+                "content": "Employees are entitled to 8 days of sick leave per year."
+            }
+        ],
+        "last_updated": "2025-01-01"
+    },
+    {
+        "doc_id": "hr_002",
+        "doc_type": "hr",
+        "title": "Leave Policy 2026",
+        "effective_date": "2026-01-01",
+        "organization": "ABC Pvt Ltd",
+        "sections": [
+            {
+                "heading": "Casual Leave",
+                "content": "Employees are entitled to 12 days of casual leave per year."
+            },
+            {
+                "heading": "Sick Leave",
+                "content": "Employees are entitled to 10 days of sick leave per year."
+            },
+            {
+                "heading": "Maternity Leave",
+                "content": "Female employees are entitled to 26 weeks of paid maternity leave."
+            }
+        ],
+        "last_updated": "2026-01-01"
+    },
+    {
+        "doc_id": "insurance_001",
+        "doc_type": "insurance_policy",
+        "document_id": "INS-3005-379835156-01-000",
+        "insurer": {
+            "company_name": "ICICI Lombard General Insurance Company Limited",
+            "reference_no": "W514789422",
+            "gstin": "07AAACI7904G1ZP"
+        },
+        "policy_details": {
+            "policy_number": "3005/379835156/01/000",
+            "policy_issued_on": "2026-02-07",
+            "policy_period": {
+                "start": "2026-02-12 00:00:00",
+                "end": "2027-02-11 23:59:59"
+            },
+            "geographical_area": "India"
+        },
+        "insured_details": {
+            "name": "PARTHIBAN"
+        },
+        "vehicle_details": {
+            "registration_number": "KA05JB7614",
+            "make": "Suzuki",
+            "model": "UZ 125",
+            "manufacturing_year": 2013,
+            "idv": 25500.00
+        },
+        "premium_breakdown": {
+            "total_package_premium": 1694.00,
+            "total_tax_payable": 305.00,
+            "total_premium_payable": 1999.00
+        },
+        "metadata": {
+            "document_category": "motor_insurance",
+            "vehicle_type": "two_wheeler",
+            "year": 2026,
+            "month": 2
+        }
+    }
+]
