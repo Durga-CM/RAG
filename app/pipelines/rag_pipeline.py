@@ -30,6 +30,10 @@ class RAGPipeline:
         # Fetch up to 3 files as per standalone default
         selected_files_meta = self.retrieval.retrieve(query, detected_doc_type, detected_filename, limit=3)
 
+        # LOGICAL ORDERING: Sort files alphabetically so "ID 1" is always 
+        # the first logical file (e.g., invoice_001). This prevents Source mismatches.
+        selected_files_meta.sort(key=lambda x: x['file_name'])
+
         if not selected_files_meta:
             return {
                 "answer": "🤖 I couldn't find any relevant documents. Check if files are scanned/empty.",
@@ -58,26 +62,63 @@ class RAGPipeline:
             
             all_contexts.append({
                 'file_name': sf['file_name'],
+                'doc_type': sf['doc_type'],
                 'content': file_text
             })
 
-        # STANDALONE STEP 5: Hybrid Search (AI Extraction)
-        combined_context = "\n\n".join([
-            f"=== FILE: {ctx['file_name']} ===\n{ctx['content']}" 
-            for ctx in all_contexts
-        ])
+        # STANDALONE STEP 5: AI Extraction and Generation (CONSOLIDATED)
+        answer_text = self.generator.generate(query, all_contexts)
         
-        # Standalone limits context to 15000 in extract_metadata_llm call
-        extracted_info = self.extractor.extract(combined_context, query)
+        # --- SOURCE ALIGNMENT LOGIC ---
+        all_retrieved_names = [ctx["file_name"] for ctx in all_contexts]
+        aligned_sources = []
+        clean_answer = answer_text
         
-        if extracted_info:
-            print(f"✨ AI EXTRACTION: {extracted_info}")
+        # 1. Detect multiple Sources from LLM Response (for aggregate queries)
+        import re
+        source_pattern = r"(?i)Source:\s*([\d\s,]+)"
+        source_match = re.search(source_pattern, answer_text)
+        
+        if source_match:
+            try:
+                # Handle comma-separated list like "Source: 1, 2"
+                indices = [int(i.strip()) for i in source_match.group(1).replace(",", " ").split()]
+                for idx_val in indices:
+                    doc_idx = idx_val - 1
+                    if 0 <= doc_idx < len(all_retrieved_names):
+                        primary_source = all_retrieved_names[doc_idx]
+                        if primary_source not in aligned_sources:
+                            aligned_sources.append(primary_source)
+            except Exception:
+                pass
+            
+            # 2. STRIP the Source line from the final answer text
+            clean_answer = re.sub(source_pattern, "", answer_text).strip()
 
-        # STANDALONE STEP 6: LLM Generation
-        answer_text = self.generator.generate(query, all_contexts, extracted_info)
+        # --- NEW AGGRESSIVE CLEANUP ---
+        # 1. Strip residual "Document N", "Ref N", "Reference N" in parentheses or brackets
+        clean_answer = re.sub(r'(?i)\(?(Document|Ref|Reference|Internal_ID)\s*\d+\)?', '', clean_answer)
+        clean_answer = re.sub(r'(?i)\[?(Document|Ref|Reference|Internal_ID)\s*\d+\]?', '', clean_answer)
+
+        # 2. Strip any known technical filenames from the conversational text.
+        for name in all_retrieved_names:
+            # Strip full filename (e.g., insurance_001.json)
+            clean_answer = clean_answer.replace(name, "").strip()
+            # Strip ID-only name (e.g., insurance_001)
+            id_name = name.replace(".json", "")
+            if id_name in clean_answer:
+                # We use a regex to ensure we only strip it if it's a standalone "tag" at the end
+                clean_answer = re.sub(rf'\n*\s*{id_name}\s*$', '', clean_answer).strip()
         
+        # Final cleanup factor
+        clean_answer = clean_answer.replace("()", "").replace("[]", "").strip()
+        
+        # FALLBACK: If no tag found, use the first retrieved file
+        if not aligned_sources and all_retrieved_names:
+            aligned_sources = [all_retrieved_names[0]]
+
         return {
-            "answer": answer_text,
+            "answer": clean_answer,
             "detected_doc_type": detected_doc_type,
-            "sources": [ctx["file_name"] for ctx in all_contexts]
+            "sources": aligned_sources  # Relevant file remains here
         }

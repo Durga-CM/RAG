@@ -3,28 +3,32 @@ from app.core.config import LLM_MODEL
 
 class GenerationService:
 
-    def generate(self, query, contexts, extracted_info=None):
+    def generate(self, query, contexts):
         """
-        Final answer generation.
-        Uses a strict Hierarchy of Truth to prevent mixing values.
+        Consolidated extraction and final answer generation.
         """
         # Formulate context block
+        # We use INTERNAL_ID_N to discourage the LLM from repeating it.
         context_block = ""
         for idx, ctx in enumerate(contexts):
-            context_block += f"\n--- DOCUMENT {idx+1} Content ({ctx['file_name']}) ---\n{ctx['content']}\n"
+            label = ctx['doc_type'].replace('_', ' ').upper()
+            context_block += f"\n[[INTERNAL_ID_{idx+1}: {label}]]\n{ctx['content']}\n"
 
-        system_prompt = f"""You are a professional document analysis agent.
-Your task is to answer the user's question using ONLY the [DOCUMENT Content] provided.
+        system_prompt = f"""You are a helpful and professional document analysis assistant. 
 
-CONTENT:
+CONTEXT DATA:
 {context_block}
 
-STRICT OPERATIONAL RULES:
-1. ONLY use data labeled in the document body (e.g. 'Invoice No:', 'Reference No:').
-2. DO NOT use the filename metadata (e.g. 'Invoice_2500194869') as a data value.
-3. If an extraction hint is provided ('{extracted_info}'), use it only to locate the relevant field in the documents — do NOT treat it as the sole answer if multiple documents each have their own distinct value.
-4. If multiple different values are found across documents, list ALL of them and clearly state which document each comes from. Do not pick a "primary" one arbitrarily.
-5. Provide a direct, factual answer. Do not apologize or explain your steps."""
+GUIDELINES FOR YOUR RESPONSE:
+1. **Direct Answer**: Provide a polite, direct answer based ONLY on the context above.
+2. **Identification**: Refer to files by their natural names (e.g. "The 2026 Leave Policy", "the ICICI insurance policy").
+3. **STRICT PROHIBITION**: 
+   - **DO NOT** use generic labels like "Document 1", "Reference 1", or "ID 1".
+   - **DO NOT** include internal tags like "(Document 1)" or "[INTERNAL_ID_1]" in your sentences.
+   - Speak naturally. If you mention a document, just use its title.
+4. **Source Tag**: At the very end of your response, on a COMPLETELY NEW LINE, add exactly: "Source: N, M" where N, M are the numbers from the INTERNAL_ID_N tags used.
+   - Example: "Source: 1, 2"
+5. **Accuracy**: Do not hallucinate. Do not mix up item prices with subtotals."""
 
         try:
             response = ollama.chat(
@@ -32,8 +36,9 @@ STRICT OPERATIONAL RULES:
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": query}
-                ]
+                ],
+                options={"temperature": 0}
             )
             return response["message"]["content"].strip()
         except Exception as e:
-            return f"Error: {str(e)}"
+            return f"Error during generation: {str(e)}"

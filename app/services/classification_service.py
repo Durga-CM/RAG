@@ -25,6 +25,7 @@ Analyze the following document text and classify it into ONE category:
 - invoice: Financial/billing documents — bills, invoices, receipts, tax documents, financial statements, payment records
 - hr: Employee/workforce documents — employee records, payroll, recruitment, performance reviews, salary, attendance, leave policies
 - insurance_policy: Insurance documents — vehicle/motor/health/life/property insurance policies, policy schedules, premium breakdowns, IDV, coverage details, insurer details
+- aws_statement: AWS billing or account statements — AWS services, AWS charges, cloud hosting costs, statement number
 - general: Any document that doesn't clearly fit the above categories
 
 **Document Text:**
@@ -39,7 +40,8 @@ Analyze the following document text and classify it into ONE category:
    - Invoice: "Amount Payable", "GST", "Bill Number", "Tax Invoice", "Supplier", "Recipient"
    - HR: "Employee ID", "Salary", "Department", "Designation", "Leave", "Payroll"
    - Insurance: "Policy Number", "Insurer", "IDV", "Premium", "Policy Period", "Insured", "Vehicle Registration"
-3. Return ONLY one word: medical, invoice, hr, insurance_policy, or general
+   - AWS Statement: "AWS Service", "Amazon", "Route 53", "AWS Account"
+3. Return ONLY one word: medical, invoice, hr, insurance_policy, aws_statement, or general
 4. No explanation, no punctuation, just the category label
 
 **Category:**"""
@@ -50,7 +52,7 @@ Analyze the following document text and classify it into ONE category:
                 messages=[{"role": "user", "content": classification_prompt}]
             )
             doc_type = response["message"]["content"].strip().lower()
-            valid_types = ["medical", "invoice", "hr", "insurance_policy", "general"]
+            valid_types = ["medical", "invoice", "hr", "insurance_policy", "aws_statement", "general"]
             if doc_type in valid_types:
                 return doc_type
             for vtype in valid_types:
@@ -62,13 +64,70 @@ Analyze the following document text and classify it into ONE category:
 
     def classify_query(self, query: str) -> str | None:
         """
-        🔥 PRODUCTION-GRADE: LLM-based query classification.
-        Directly from invoice_rag_standalone.py
+        🔥 PRODUCTION-GRADE: Heuristic-first query classification.
+        Saves one LLM call and detects cross-category requests.
         """
         query_key = query.lower().strip()
         if query_key in self._cache:
             return self._cache[query_key]
         
+        # --- 1. DETECT CROSS-CATEGORY / AGGREGATE REQUESTS ---
+        # If the user asks for "total", "all", "exposure", or mentions multiple types,
+        # we return None to disable filtering and search EVERYTHING.
+        query_lower = query_key
+        categories_found = []
+        if any(word in query_lower for word in ["insurance", "premium", "policy"]): categories_found.append("insurance_policy")
+        if any(word in query_lower for word in ["medical", "patient", "lab", "hospital"]): categories_found.append("medical")
+        if any(word in query_lower for word in ["invoice", "bill", "gst", "payment", "customer", " id ", "id:", "rate"]): categories_found.append("invoice")
+        if any(word in query_lower for word in ["hr", "employee", "leave", "salary"]): categories_found.append("hr")
+        if any(word in query_lower for word in ["aws", "amazon"]): categories_found.append("aws_statement")
+
+        is_aggregate = any(word in query_lower for word in [
+            "total", "sum", "exposure", "all", "summary", "everything", 
+            "grand total", "most", "highest", "max", "maximum", "biggest"
+        ])
+        
+        # If multiple categories or aggregate keywords found, search everything
+        unique_categories = list(set(categories_found))
+        
+        if len(unique_categories) > 1:
+            result = "cross_category"
+        elif len(unique_categories) == 1:
+            # Multi-file but single domain (e.g., multiple invoices)
+            result = unique_categories[0]
+        elif is_aggregate:
+            # "Total exposure" with no specific category keywords
+            result = "cross_category"
+        else:
+            result = None
+
+        if result:
+            self._cache[query_key] = result
+            return result
+
+        # --- 2. SINGLE CATEGORY HEURISTIC ---
+        if "insurance_policy" in categories_found:
+            result = "insurance_policy"
+            self._cache[query_key] = result
+            return result
+        elif "medical" in categories_found:
+            result = "medical"
+            self._cache[query_key] = result
+            return result
+        elif "invoice" in categories_found:
+            result = "invoice"
+            self._cache[query_key] = result
+            return result
+        elif "hr" in categories_found:
+            result = "hr"
+            self._cache[query_key] = result
+            return result
+        elif "aws_statement" in categories_found:
+            result = "aws_statement"
+            self._cache[query_key] = result
+            return result
+
+        # --- 3. LLM FALLBACK (Slow) ---
         classification_prompt = f"""You are a document type classifier.
 
 Classify the following user query into ONE of these categories:
@@ -76,17 +135,19 @@ Classify the following user query into ONE of these categories:
 - invoice (bills, payments, tax documents, goods/services billing, GST, supplier, recipient)
 - hr (employee data, payroll, recruitment, workforce, leave policy, salary, attendance)
 - insurance_policy (insurance policies, premium, IDV, policy number, insurer, coverage, vehicle insurance, policy period, insured name)
+- aws_statement (aws statement, aws billing, aws services, route 53, ec2, cloud costs, cloud hosting)
 - general (if the query doesn't clearly fit any specific category)
 
 USER QUERY: "{query}"
 
 RULES:
-1. Return ONLY the category label (one word: medical, invoice, hr, insurance_policy, or general)
+1. Return ONLY the category label (one word: medical, invoice, hr, insurance_policy, aws_statement, or general)
 2. No explanation, no punctuation, just the label
 3. If unsure, return "general"
 4. CRITICAL: Queries about "premium", "policy number", "IDV", "insurer", "insured", "policy period", "coverage" → ALWAYS insurance_policy
 5. Queries about "GST", "bill", "supplier", "items bought" → invoice
 6. HR is ONLY for non-financial topics like Leave, Attendance, Hiring, or Roles.
+7. Queries about "aws", "aws statement", "aws services", "cloud charges", "ec2" → aws_statement
 
 CATEGORY:"""
 
@@ -96,7 +157,7 @@ CATEGORY:"""
                 messages=[{"role": "user", "content": classification_prompt}]
             )
             doc_type = response["message"]["content"].strip().lower()
-            valid_types = ["medical", "invoice", "hr", "insurance_policy", "general"]
+            valid_types = ["medical", "invoice", "hr", "insurance_policy", "aws_statement", "general"]
 
             result = None
             if doc_type in valid_types:
@@ -110,19 +171,8 @@ CATEGORY:"""
             self._cache[query_key] = result
             return result
         except Exception:
-            query_lower = query.lower()
-            if any(word in query_lower for word in ["insurance", "premium", "idv", "policy number", "insurer", "insured", "policy period", "coverage", "vehicle registration"]):
-                result = "insurance_policy"
-            elif any(word in query_lower for word in ["medical", "patient", "doctor", "hospital", "diagnosis", "wbc", "blood", "health", "hemoglobin", "lab", "prescription"]):
-                result = "medical"
-            elif any(word in query_lower for word in ["invoice", "bill", "payment", "amount", "gst", "tax", "supplier", "items"]):
-                result = "invoice"
-            elif any(word in query_lower for word in ["hr", "employee", "payroll", "recruitment", "salary", "leave", "workforce"]):
-                result = "hr"
-            else:
-                result = None
-            self._cache[query_key] = result
-            return result
+            self._cache[query_key] = None
+            return None
 
     def detect_filename_in_query(self, query: str) -> str | None:
         """

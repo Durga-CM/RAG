@@ -15,7 +15,7 @@ class RetrievalService:
         query_vector = self.embedding.embed_query(query)
 
         search_filter = None
-        if doc_type:
+        if doc_type and doc_type != "cross_category":
             search_filter = models.Filter(
                 must=[models.FieldCondition(key="doc_type", match=models.MatchValue(value=doc_type))]
             )
