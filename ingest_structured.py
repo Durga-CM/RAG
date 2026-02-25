@@ -6,4 +6,4 @@ from app.pipelines.structured_ingestion_pipeline import StructuredIngestionPipel
 
 if __name__ == "__main__":
     pipeline = StructuredIngestionPipeline()
-    pipeline.run(force_rebuild=True)
+    pipeline.run(force_rebuild=False)

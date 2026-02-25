@@ -194,5 +194,192 @@
             "year": 2026,
             "month": 2
         }
+    },
+    {
+        "doc_id": "aws_001",
+        "doc_type": "aws_statement",
+        "document_type": "AWS Account Statement",
+        "statement_details": {
+            "statement_number": "2500194869",
+            "statement_date": "2026-02-01",
+            "billing_period": {
+                "from": "2026-01-01",
+                "to": "2026-01-31"
+            },
+            "due_date": "2026-02-01"
+        },
+        "account_details": {
+            "account_number": "378423228887",
+            "bill_to": {
+                "company_name": "CannyMinds Technology Solutions Private Limited",
+                "attention": "Udayakumar Murugan",
+                "address": {
+                    "line1": "No:88, Ramnagar 6th Street",
+                    "area": "Velachery",
+                    "city": "Chennai",
+                    "state": "Tamilnadu",
+                    "postal_code": "600042",
+                    "country": "India"
+                }
+            }
+        },
+        "currency": {
+            "primary_currency": "USD",
+            "converted_currency": "INR",
+            "conversion_rate": 91.67265
+        },
+        "summary": {
+            "aws_service_charges_usd": 598.94,
+            "charges_usd": 507.61,
+            "credits_usd": 0.00,
+            "gst_usd": 91.33,
+            "total_usd": 598.94,
+            "total_inr": 54906.42
+        },
+        "services": [
+            {
+                "service_name": "Amazon Route 53",
+                "charges_usd": 0.53,
+                "gst_usd": 0.10,
+                "total_usd": 0.63
+            },
+            {
+                "service_name": "Amazon Virtual Private Cloud",
+                "charges_usd": 33.59,
+                "gst_usd": 6.04,
+                "total_usd": 39.63
+            },
+            {
+                "service_name": "AWS CodePipeline",
+                "charges_usd": 2.00,
+                "gst_usd": 0.36,
+                "total_usd": 2.36
+            },
+            {
+                "service_name": "AWS Lambda",
+                "charges_usd": 0.36,
+                "gst_usd": 0.06,
+                "total_usd": 0.42
+            },
+            {
+                "service_name": "Amazon Elastic Compute Cloud",
+                "charges_usd": 190.71,
+                "gst_usd": 34.33,
+                "total_usd": 225.04
+            },
+            {
+                "service_name": "AWS Step Functions",
+                "charges_usd": 4.36,
+                "gst_usd": 0.78,
+                "total_usd": 5.14
+            },
+            {
+                "service_name": "Amazon Cognito",
+                "charges_usd": 0.00,
+                "gst_usd": 0.00,
+                "total_usd": 0.00
+            },
+            {
+                "service_name": "AWS Data Transfer",
+                "charges_usd": 0.26,
+                "gst_usd": 0.04,
+                "total_usd": 0.30
+            },
+            {
+                "service_name": "Amazon API Gateway",
+                "charges_usd": 1.51,
+                "gst_usd": 0.27,
+                "total_usd": 1.78
+            },
+            {
+                "service_name": "AWS Glue",
+                "charges_usd": 0.00,
+                "gst_usd": 0.00,
+                "total_usd": 0.00
+            },
+            {
+                "service_name": "Amazon Simple Storage Service",
+                "charges_usd": 25.48,
+                "gst_usd": 4.58,
+                "total_usd": 30.06
+            },
+            {
+                "service_name": "Elastic Load Balancing",
+                "charges_usd": 17.86,
+                "gst_usd": 3.21,
+                "total_usd": 21.07
+            },
+            {
+                "service_name": "Amazon Simple Email Service",
+                "charges_usd": 0.02,
+                "gst_usd": 0.00,
+                "total_usd": 0.02
+            },
+            {
+                "service_name": "AWS Database Migration Service",
+                "charges_usd": 78.86,
+                "gst_usd": 14.19,
+                "total_usd": 93.05
+            },
+            {
+                "service_name": "AWS CloudTrail",
+                "charges_usd": 0.00,
+                "gst_usd": 0.00,
+                "total_usd": 0.00
+            },
+            {
+                "service_name": "Amazon Simple Notification Service",
+                "charges_usd": 0.00,
+                "gst_usd": 0.00,
+                "total_usd": 0.00
+            },
+            {
+                "service_name": "AWS Secrets Manager",
+                "charges_usd": 6.35,
+                "gst_usd": 1.14,
+                "total_usd": 7.49
+            },
+            {
+                "service_name": "AWS Key Management Service",
+                "charges_usd": 1.00,
+                "gst_usd": 0.18,
+                "total_usd": 1.18
+            },
+            {
+                "service_name": "AWS CloudFormation",
+                "charges_usd": 0.00,
+                "gst_usd": 0.00,
+                "total_usd": 0.00
+            },
+            {
+                "service_name": "Amazon CloudWatch",
+                "charges_usd": 0.87,
+                "gst_usd": 0.16,
+                "total_usd": 1.03
+            },
+            {
+                "service_name": "Amazon Relational Database Service",
+                "charges_usd": 143.85,
+                "gst_usd": 25.89,
+                "total_usd": 169.74
+            },
+            {
+                "service_name": "Amazon CloudFront",
+                "charges_usd": 0.00,
+                "gst_usd": 0.00,
+                "total_usd": 0.00
+            }
+        ],
+        "notes": [
+            "This is not a GST Invoice.",
+            "All charges and prices are in USD.",
+            "Usage and recurring charges may differ from displayed values."
+        ]
+    },
+    {
+        "doc_id": "new_knowledge_001",
+        "doc_type": "knowledge",
+        "title": "Future Tech Trends 2026",
+        "content": "In 2026, agentic AI systems will become the standard for software development, enabling seamless human-AI collaboration."
     }
 ]

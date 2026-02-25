@@ -20,6 +20,12 @@ rag_pipeline        = RAGPipeline()
 ingestion_pipeline  = StructuredIngestionPipeline()
 
 
+@app.get("/")
+async def root():
+    """Root endpoint to verify the API is accessible."""
+    return {"message": "Universal JSON RAG API is running"}
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Returns service health status."""
@@ -44,10 +50,11 @@ async def query_rag(request: QueryRequest):
 
 
 @app.post("/ingest")
-async def trigger_ingestion(force_rebuild: bool = True):
+async def trigger_ingestion(force_rebuild: bool = False):
     """
-    Re-indexes all documents from dataset.json into the vector store.
-    Set force_rebuild=false to skip if collection already exists.
+    Ingests documents from dataset.json into the vector store.
+    - Set force_rebuild=true to delete the collection and start from scratch.
+    - Set force_rebuild=false (default) to skip already indexed documents.
     """
     try:
         logger.info(f"Triggering structured ingestion (force_rebuild={force_rebuild})")

@@ -117,40 +117,63 @@ class StructuredIngestionPipeline:
     def __init__(self):
         self.client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
 
-    def run(self, force_rebuild: bool = True) -> dict:
+    def run(self, force_rebuild: bool = False) -> dict:
         """
         Load dataset.json, chunk every document universally, embed and upsert.
-        Returns a summary dict: { total_docs, total_chunks, message }
+        Supports incremental ingestion by skipping documents already in the vector store.
         """
         print(f"🚀 Loading dataset from {DATASET_FILE}...")
+
+        if not os.path.exists(DATASET_FILE):
+            return {"total_docs": 0, "total_chunks": 0, "message": f"Dataset file not found at {DATASET_FILE}"}
 
         with open(DATASET_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         # Reset or ensure collection
         collections = self.client.get_collections().collections
-        if any(c.name == COLLECTION_NAME for c in collections):
-            if force_rebuild:
-                print(f"⚠️  Recreating collection '{COLLECTION_NAME}'...")
-                self.client.delete_collection(COLLECTION_NAME)
-            else:
-                print(f"ℹ️  Collection '{COLLECTION_NAME}' already exists — skipping rebuild.")
-                return {"total_docs": 0, "total_chunks": 0,
-                        "message": "Collection already exists. Pass force_rebuild=true to re-index."}
+        exists = any(c.name == COLLECTION_NAME for c in collections)
 
-        self.client.create_collection(
-            collection_name=COLLECTION_NAME,
-            vectors_config=models.VectorParams(
-                size=VECTOR_SIZE,
-                distance=models.Distance.COSINE
+        if exists and force_rebuild:
+            print(f"⚠️  Recreating collection '{COLLECTION_NAME}'...")
+            self.client.delete_collection(COLLECTION_NAME)
+            exists = False
+
+        if not exists:
+            print(f"🆕 Creating collection '{COLLECTION_NAME}'...")
+            self.client.create_collection(
+                collection_name=COLLECTION_NAME,
+                vectors_config=models.VectorParams(
+                    size=VECTOR_SIZE,
+                    distance=models.Distance.COSINE
+                )
             )
-        )
 
         points = []
         total_chunks = 0
+        new_docs_processed = 0
 
         for doc in data:
-            print(f"   🔹 Processing: {doc.get('doc_id')} ({doc.get('doc_type')})")
+            doc_id = doc.get("doc_id", str(uuid.uuid4()))
+            
+            # Incremental Check: Skip if doc_id already exists in Qdrant
+            if not force_rebuild:
+                check_res = self.client.count(
+                    collection_name=COLLECTION_NAME,
+                    count_filter=models.Filter(
+                        must=[
+                            models.FieldCondition(
+                                key="doc_id",
+                                match=models.MatchValue(value=doc_id),
+                            )
+                        ]
+                    )
+                )
+                if check_res.count > 0:
+                    # Document already processed — skip
+                    continue
+
+            print(f"   🔹 Processing: {doc_id} ({doc.get('doc_type', 'general')})")
             chunks = chunk_document(doc)
 
             for chunk in chunks:
@@ -168,14 +191,20 @@ class StructuredIngestionPipeline:
                     payload=payload
                 ))
                 total_chunks += 1
+            
+            new_docs_processed += 1
 
         if points:
+            # Batch upsert all new points
             self.client.upsert(collection_name=COLLECTION_NAME, points=points)
+            msg = f"Successfully indexed {total_chunks} chunks from {new_docs_processed} new documents."
+        else:
+            msg = "No new documents to index."
 
-        msg = f"Successfully indexed {total_chunks} chunks from {len(data)} documents."
         print(f"✅ {msg}")
         return {
             "total_docs":   len(data),
+            "new_docs":     new_docs_processed,
             "total_chunks": total_chunks,
             "message":      msg
         }
