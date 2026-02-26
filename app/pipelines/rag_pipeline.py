@@ -16,7 +16,7 @@ class RAGPipeline:
         self.extractor = ExtractionService()
         self.generator = GenerationService()
 
-    def answer(self, query):
+    def answer(self, query, history_text=None):
         # STANDALONE STEP 0: Detect Document Type from Query
         detected_doc_type = self.classifier.classify_query(query)
         detected_filename = self.classifier.detect_filename_in_query(query)
@@ -35,10 +35,14 @@ class RAGPipeline:
         selected_files_meta.sort(key=lambda x: x['file_name'])
 
         if not selected_files_meta:
-            return {
-                "answer": "🤖 I couldn't find any relevant documents. Check if files are scanned/empty.",
-                "sources": []
-            }
+            if detected_doc_type == "general":
+                # For general queries, we allow zero documents
+                pass
+            else:
+                return {
+                    "answer": "🤖 I couldn't find any relevant documents. Check if files are scanned/empty.",
+                    "sources": []
+                }
 
         if len(selected_files_meta) == 1:
             print(f"🔍 Focused on file: {selected_files_meta[0]['file_name']} (Type: {selected_files_meta[0]['doc_type']})")
@@ -67,7 +71,7 @@ class RAGPipeline:
             })
 
         # STANDALONE STEP 5: AI Extraction and Generation (CONSOLIDATED)
-        answer_text = self.generator.generate(query, all_contexts)
+        answer_text = self.generator.generate(query, all_contexts, history_text=history_text)
         
         # --- SOURCE ALIGNMENT LOGIC ---
         all_retrieved_names = [ctx["file_name"] for ctx in all_contexts]
@@ -113,9 +117,14 @@ class RAGPipeline:
         # Final cleanup factor
         clean_answer = clean_answer.replace("()", "").replace("[]", "").strip()
         
-        # FALLBACK: If no tag found, use the first retrieved file
-        if not aligned_sources and all_retrieved_names:
-            aligned_sources = [all_retrieved_names[0]]
+        # FALLBACK: If no tag found, use relevant source
+        if not aligned_sources:
+            if detected_doc_type == "general":
+                aligned_sources = ["general"]
+            elif all_retrieved_names:
+                aligned_sources = [all_retrieved_names[0]]
+            else:
+                aligned_sources = []
 
         return {
             "answer": clean_answer,

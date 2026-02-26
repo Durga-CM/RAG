@@ -11,3 +11,5 @@ langchain-text-splitters
 tiktoken
 pymupdf
 numpy
+sqlalchemy
+psycopg2

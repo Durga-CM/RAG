@@ -3,21 +3,23 @@ from app.core.config import LLM_MODEL
 
 class GenerationService:
 
-    def generate(self, query, contexts):
+    def generate(self, query, contexts, history_text=None):
         """
         Consolidated extraction and final answer generation.
         """
         # Formulate context block
-        # We use INTERNAL_ID_N to discourage the LLM from repeating it.
         context_block = ""
         for idx, ctx in enumerate(contexts):
             label = ctx['doc_type'].replace('_', ' ').upper()
             context_block += f"\n[[INTERNAL_ID_{idx+1}: {label}]]\n{ctx['content']}\n"
 
+        history_block = f"\nRECENT CHAT HISTORY:\n{history_text}\n" if history_text else ""
+
         system_prompt = f"""You are a helpful and professional document analysis assistant. 
 
 CONTEXT DATA:
 {context_block}
+{history_block}
 
 GUIDELINES FOR YOUR RESPONSE:
 1. **Direct Answer**: Provide a polite, direct answer based ONLY on the context above.

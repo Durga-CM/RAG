@@ -70,54 +70,73 @@ Supports invoices, medical reports, HR policies, insurance policies — and any 
 
 ```
 rag_llm/
-├── run_api.py                # 🚀 FastAPI server entry point (production)
-├── ingest_structured.py      # 🔧 CLI wrapper for one-time dataset ingestion
+├── run_api.py                # 🚀 FastAPI server entry point
 ├── requirements.txt
 ├── .env.example
+├── alembic.ini               # 🗄 Alembic migration config
+├── alembic/                  # 📂 Migration versions and environment
 │
 ├── data_invoice/
-│   └── dataset.json          # All documents in one JSON array (any doc types)
+│   └── dataset.json          # All documents in one JSON array
 │
 └── app/
     ├── api/
-    │   ├── main.py           # FastAPI routes: /query  /ingest  /health
-    │   └── schemas.py        # Pydantic request/response models
+    │   └── main.py           # FastAPI routes (Session-based)
+    │
+    ├── db/
+    │   └── database.py       # SQLAlchemy connection engine
+    │
+    ├── models/
+    │   ├── models.py         # SQLAlchemy DB Models (ChatHistory)
+    │   └── schemas.py        # Pydantic API Schemas
     │
     ├── pipelines/
     │   ├── rag_pipeline.py                  # End-to-end RAG orchestration
-    │   └── structured_ingestion_pipeline.py # Universal JSON ingestion (used by API + CLI)
+    │   └── structured_ingestion_pipeline.py # Universal JSON ingestion
     │
-    ├── services/
-    │   ├── classification_service.py  # LLM-based doc type & query classifier
-    │   ├── retrieval_service.py       # Vector search + score-based reranking
-    │   ├── extraction_service.py      # High-precision field extraction
-    │   ├── generation_service.py      # Final LLM answer generation
-    │   ├── embedding_service.py       # Text embedding via Ollama
-    │   └── vector_store_service.py    # Qdrant client wrapper
-    │
-    └── core/
-        └── config.py         # Centralized config & environment variable loading
+    └── services/
+        ├── history_service.py         # Chat logic (Save/Retrieve/Format)
+        ├── classification_service.py  # LLM-based doc classifier
+        ├── retrieval_service.py       # Vector search + reranking
+        ├── extraction_service.py      # High-precision field extraction
+        ├── generation_service.py      # Final LLM answer generation
+        ├── embedding_service.py       # Text embedding via Ollama
+        └── vector_store_service.py    # Qdrant client wrapper
+```
+
+---
+
+## 🏗 Database Setup
+
+This project uses **PostgreSQL** for chat history and **Alembic** for migrations.
+
+## 4. Database Migrations (Alembic)
+
+### Generate initial migration:
+```bash
+alembic revision --autogenerate -m "Initial tables"
+```
+
+### Apply migrations to database:
+```bash
+alembic upgrade head
 ```
 
 ---
 
 ## 🏃 Running the Project
 
-### Option 1 — Interactive CLI
+### Option 1 — Interactive CLI (Legacy)
 
 ```bash
-# Step 1: Ingest your dataset (run once, or when dataset.json changes)
-python ingest_structured.py
-
-# Step 2: Start the chat interface
 python main.py
 ```
 
-### Option 2 — FastAPI REST Server
+### Option 2 — FastAPI REST Server (Recommended)
 
 ```bash
 # Step 1: Ingest your dataset
-python ingest_structured.py
+curl -X POST http://127.0.0.1:8000/ingest?force_rebuild=true
 
 # Step 2: Start the API server
 python run_api.py
@@ -125,25 +144,33 @@ python run_api.py
 
 API will be available at:
 - Swagger UI: `http://127.0.0.1:8000/docs`
-- ReDoc: `http://127.0.0.1:8000/redoc`
 
 ---
 
-## 📡 API Endpoints
+## 📡 API Endpoints (RESTful Session Workflow)
 
-| Method | Endpoint  | Description                          |
-|--------|-----------|--------------------------------------|
-| GET    | `/health` | Health check                         |
-| POST   | `/query`  | Submit a query to the RAG pipeline   |
-| POST   | `/ingest` | Trigger document re-ingestion        |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST   | `/sessions` | Create a new chat session and get a `session_id` |
+| POST   | `/sessions/{id}/query` | Submit a query to a specific session |
+| GET    | `/sessions/{id}/history` | Retrieve full chat history |
+| DELETE | `/sessions/{id}` | Clear session history |
+| POST   | `/ingest` | Trigger document re-ingestion |
 
-### Example Query Request
+### Example Workflow
 
-```bash
-curl -X POST http://127.0.0.1:8000/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "What is the total premium payable in the insurance?"}'
-```
+1.  **Create Session**:
+    ```bash
+    curl -X POST http://127.0.0.1:8000/sessions
+    # Response: {"session_id": "chat_abc123"}
+    ```
+
+2.  **Query within Session**:
+    ```bash
+    curl -X POST http://127.0.0.1:8000/sessions/chat_abc123/query \
+      -H "Content-Type: application/json" \
+      -d '{"query": "What is the total premium for Parthiban?"}'
+    ```
 
 ### Example Response
 

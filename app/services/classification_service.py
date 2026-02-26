@@ -161,7 +161,7 @@ CATEGORY:"""
 
             result = None
             if doc_type in valid_types:
-                result = doc_type if doc_type != "general" else None
+                result = doc_type
             else:
                 for vtype in valid_types:
                     if vtype in doc_type:

@@ -22,3 +22,6 @@ QDRANT_PORT = int(os.getenv("QDRANT_PORT", 6333))
 VECTOR_SIZE = 768
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", 1500))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", 100))
+
+# PostgreSQL Configuration
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/rag_history")
