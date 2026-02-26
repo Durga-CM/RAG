@@ -1,7 +1,8 @@
 from typing import List
 import uuid
 import logging
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.models.schemas import (
@@ -96,6 +97,82 @@ async def query_session(session_id: str, request: MessageRequest, db: Session = 
     except Exception as e:
         logger.error(f"Error in session {session_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- SHARED STATE FOR SESSION CONTROL ---
+active_stops = {}  # session_id -> asyncio.Event
+
+
+@app.post("/sessions/{session_id}/stream")
+async def stream_session(session_id: str, request: MessageRequest, db: Session = Depends(get_db)):
+    """
+    Streamed version of the query endpoint. 
+    Supports interruption via client disconnect OR explicit /stop API.
+    """
+    import asyncio
+    
+    try:
+        logger.info(f"Processing session query (STREAM): {session_id}")
+        
+        # Initialize stop trigger for this session
+        stop_event = asyncio.Event()
+        active_stops[session_id] = stop_event
+
+        # 1. Fetch History
+        raw_history = HistoryService.get_history(db, session_id, limit=10)
+        history_text = HistoryService.format_history_for_llm(raw_history)
+        
+        # 2. Generator function
+        async def event_generator():
+            full_answer = ""
+            # Save User message first
+            HistoryService.save_message(db, session_id, "user", request.query)
+            
+            try:
+                # Iterate through the pipeline stream
+                for token in rag_pipeline.answer_stream(request.query, history_text=history_text):
+                    # CHECK FOR STOP SIGNAL
+                    if stop_event.is_set():
+                        logger.warning(f"Stop signal received for session {session_id}")
+                        yield "\n[STOPPED BY USER]"
+                        break
+                        
+                    full_answer += token
+                    yield token
+                    # Tiny sleep to allow other tasks (like /stop) to run
+                    await asyncio.sleep(0.01)
+                    
+            except Exception as stream_err:
+                logger.error(f"Stream error: {str(stream_err)}")
+                yield f"\n[STREAM_ERROR]: {str(stream_err)}"
+            finally:
+                # CLEANUP
+                if session_id in active_stops:
+                    del active_stops[session_id]
+                
+                # Save Assistant message once finished or interrupted
+                if full_answer.strip():
+                    HistoryService.save_message(db, session_id, "assistant", full_answer)
+                    logger.info(f"Stream for {session_id} finalized. Saved history.")
+
+        return StreamingResponse(event_generator(), media_type="text/plain")
+
+    except Exception as e:
+        logger.error(f"Error in stream session {session_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/sessions/{session_id}/stop")
+async def stop_session_generation(session_id: str):
+    """
+    Explicitly stop a running generation for a specific session.
+    """
+    if session_id in active_stops:
+        active_stops[session_id].set()
+        logger.info(f"Stop signal triggered for session: {session_id}")
+        return {"message": "Stop signal sent successfully."}
+    else:
+        return {"message": "No active generation found for this session."}
 
 
 @app.get("/sessions/{session_id}/history", response_model=List[ChatMessage])

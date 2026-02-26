@@ -17,6 +17,19 @@ class RAGPipeline:
         self.generator = GenerationService()
 
     def answer(self, query, history_text=None):
+        # NEW: GREETING FILTER
+        # Detect if the query is just a simple greeting to avoid pulling irrelevant documents.
+        is_greeting = query.lower().strip().strip('?!.') in ["hi", "hello", "hey", "hola", "greetings", "good morning", "good afternoon", "good evening"]
+        
+        if is_greeting:
+            print(f"👋 Detected greeting: {query}")
+            answer_text = self.generator.generate(query, [], history_text=history_text)
+            return {
+                "answer": answer_text,
+                "detected_doc_type": "general",
+                "sources": []
+            }
+
         # STANDALONE STEP 0: Detect Document Type from Query
         detected_doc_type = self.classifier.classify_query(query)
         detected_filename = self.classifier.detect_filename_in_query(query)
@@ -131,3 +144,106 @@ class RAGPipeline:
             "detected_doc_type": detected_doc_type,
             "sources": aligned_sources  # Relevant file remains here
         }
+
+    def answer_stream(self, query, history_text=None):
+        """
+        Streaming version of the RAG pipeline.
+        Hides the 'Source' line and appends metadata at the bottom.
+        """
+        # NEW: GREETING FILTER FOR STREAM
+        is_greeting = query.lower().strip().strip('?!.') in ["hi", "hello", "hey", "hola", "greetings", "good morning", "good afternoon", "good evening"]
+        
+        if is_greeting:
+            for token in self.generator.generate_stream(query, [], history_text=history_text):
+                yield token
+            return
+
+        # STEP 1: Classification
+        detected_doc_type = self.classifier.classify_query(query)
+        detected_filename = self.classifier.detect_filename_in_query(query)
+        
+        # STEP 2: Retrieval
+        selected_files_meta = self.retrieval.retrieve(query, detected_doc_type, detected_filename, limit=3)
+        selected_files_meta.sort(key=lambda x: x['file_name'])
+
+        if not selected_files_meta and detected_doc_type != "general":
+            yield "🤖 I couldn't find any relevant documents."
+            return
+
+        all_contexts = []
+        source_filenames = []
+        for sf in selected_files_meta:
+            source_filenames.append(sf['file_name'])
+            chunks = self.vector_store.scroll_by_file(COLLECTION_NAME, sf['file_id'])
+            chunks.sort(key=lambda x: (
+                0 if x.payload.get('section') == 'header' else 1,
+                x.payload.get('item_index', x.payload.get('chunk_index', 0))
+            ))
+            all_contexts.append({
+                'file_name': sf['file_name'],
+                'doc_type': sf['doc_type'],
+                'content': "\n".join([c.payload['text'] for c in chunks])
+            })
+
+        import re
+        import json
+
+        # STEP 3: Precise Streaming with Sliding Window Buffer
+        full_answer = ""
+        emitted_length = 0
+        forbidden_tag = "SOURCE_ID"
+        
+        # We stay 10 characters behind the LLM to ensure we never emit partial tags
+        for token in self.generator.generate_stream(query, all_contexts, history_text=history_text):
+            full_answer += token
+            
+            # Find where the forbidden tag starts
+            pos = full_answer.find(forbidden_tag)
+            
+            if pos == -1:
+                # Tag not found. Yield text that is safely behind the possible start of the tag.
+                # We leave the last N characters in the buffer to check in the next iteration.
+                safe_length = len(full_answer) - len(forbidden_tag)
+                if safe_length > emitted_length:
+                    chunk_to_yield = full_answer[emitted_length:safe_length]
+                    yield chunk_to_yield
+                    emitted_length += len(chunk_to_yield)
+            else:
+                # Tag FOUND! Yield everything up to the tag, then stop.
+                last_chunk = full_answer[emitted_length:pos]
+                if last_chunk:
+                    yield last_chunk
+                break
+        else:
+            # The loop finished naturally WITHOUT hitting 'break' 
+            # (i.e. NO SOURCE_ID was found). 
+            # We must yield the remaining characters left in the buffer.
+            if len(full_answer) > emitted_length:
+                yield full_answer[emitted_length:]
+
+        # STEP 4: Final Metadata
+        import re
+        source_pattern = r"SOURCE_ID:\s*([\d\s,]+)"
+        match = re.search(source_pattern, full_answer)
+        aligned_sources = []
+        
+        if match:
+            try:
+                indices = [int(i.strip()) for i in match.group(1).replace(",", " ").split()]
+                for idx_val in indices:
+                    doc_idx = idx_val - 1
+                    if 0 <= doc_idx < len(source_filenames):
+                        primary_source = source_filenames[doc_idx]
+                        if primary_source not in aligned_sources:
+                            aligned_sources.append(primary_source)
+            except Exception:
+                pass
+        
+        # Fallback
+        if not aligned_sources:
+            if detected_doc_type == "general":
+                aligned_sources = ["general"]
+            elif source_filenames:
+                aligned_sources = [source_filenames[0]]
+            else:
+                aligned_sources = []
