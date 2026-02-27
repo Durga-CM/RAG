@@ -6,8 +6,6 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.models.schemas import (
-    QueryRequest, 
-    QueryResponse, 
     HealthResponse, 
     ChatMessage, 
     SessionResponse, 
@@ -66,37 +64,6 @@ async def create_session():
     logger.info(f"Created new session: {new_id}")
     return SessionResponse(session_id=new_id)
 
-
-@app.post("/sessions/{session_id}/query", response_model=QueryResponse)
-async def query_session(session_id: str, request: MessageRequest, db: Session = Depends(get_db)):
-    """
-    Submit a query within a specific session. History is automatically managed.
-    """
-    try:
-        logger.info(f"Processing session query: {session_id}")
-        
-        # 1. Fetch History
-        raw_history = HistoryService.get_history(db, session_id, limit=10)
-        history_text = HistoryService.format_history_for_llm(raw_history)
-        
-        # 2. Get Answer from Pipeline
-        result = rag_pipeline.answer(request.query, history_text=history_text)
-        
-        # 3. Handle result format
-        if isinstance(result, dict):
-            answer = result.get("answer", "")
-        else:
-            answer = str(result)
-            result = {"answer": answer}
-
-        # 4. Save History
-        HistoryService.save_message(db, session_id, "user", request.query)
-        HistoryService.save_message(db, session_id, "assistant", answer)
-
-        return QueryResponse(**result)
-    except Exception as e:
-        logger.error(f"Error in session {session_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 # --- SHARED STATE FOR SESSION CONTROL ---
@@ -196,21 +163,7 @@ async def clear_session(session_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# --- LEGACY & MAINTENANCE ENDPOINTS ---
-
-@app.post("/query", response_model=QueryResponse, tags=["Legacy"])
-async def query_rag_legacy(request: QueryRequest, db: Session = Depends(get_db)):
-    """Legacy endpoint for single queries with optional session_id."""
-    # Internally maps to the new session logic if session_id is provided
-    if request.session_id:
-        return await query_session(request.session_id, MessageRequest(query=request.query), db)
-    
-    # Generic query without history
-    result = rag_pipeline.answer(request.query)
-    if not isinstance(result, dict):
-        result = {"answer": str(result)}
-    return QueryResponse(**result)
-
+# --- MAINTENANCE ENDPOINTS ---
 
 @app.post("/ingest", tags=["Maintenance"])
 async def trigger_ingestion(force_rebuild: bool = False):

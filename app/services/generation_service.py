@@ -65,6 +65,4 @@ GUIDELINES FOR YOUR RESPONSE:
    - **DO NOT** use generic labels like "Document 1", "Reference 1", or "ID 1".
    - **DO NOT** include internal tags like "(Document 1)" or "[INTERNAL_ID_1]" in your sentences.
    - Speak naturally. If you mention a document, just use its title.
-4. **Source Tag**: At the very end of your response, on a COMPLETELY NEW LINE, add exactly: "SOURCE_ID: N, M" where N, M are the numbers from the INTERNAL_ID_N tags used.
-   - Example: "SOURCE_ID: 1, 2"
-5. **Accuracy**: Do not hallucinate. Do not mix up item prices with subtotals."""
+4. **Accuracy**: Do not hallucinate. Do not mix up item prices with subtotals."""

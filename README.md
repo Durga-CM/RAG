@@ -48,7 +48,7 @@ Supports invoices, medical reports, HR policies, insurance policies — and any 
    ```bash
    python -m venv venv
    # Windows:
-   venv\Scripts\activate
+   .venv/Scripts/Activate
    # macOS/Linux:
    source venv/bin/activate
    ```
@@ -152,9 +152,10 @@ API will be available at:
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST   | `/sessions` | Create a new chat session and get a `session_id` |
-| POST   | `/sessions/{id}/query` | Submit a query to a specific session |
+| POST   | `/sessions/{id}/stream` | Submit a query via streaming response |
 | GET    | `/sessions/{id}/history` | Retrieve full chat history |
 | DELETE | `/sessions/{id}` | Clear session history |
+| POST   | `/sessions/{id}/stop` | Immediately interrupt an active stream |
 | POST   | `/ingest` | Trigger document re-ingestion |
 
 ### Example Workflow
@@ -165,21 +166,23 @@ API will be available at:
     # Response: {"session_id": "chat_abc123"}
     ```
 
-2.  **Query within Session**:
+2.  **Stream Query within Session**:
     ```bash
-    curl -X POST http://127.0.0.1:8000/sessions/chat_abc123/query \
+    curl -N -X POST http://127.0.0.1:8000/sessions/chat_abc123/stream \
       -H "Content-Type: application/json" \
       -d '{"query": "What is the total premium for Parthiban?"}'
     ```
 
-### Example Response
+### Example Streaming Output
 
-```json
-{
-  "answer": "The total premium payable is ₹1,999.",
-  "detected_doc_type": "insurance_policy",
-  "sources": ["insurance_001.json"]
-}
+```text
+The
+ total
+ premium
+ payable
+ is
+ ₹
+1,999.
 ```
 
 ---
