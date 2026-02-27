@@ -48,7 +48,7 @@ Supports invoices, medical reports, HR policies, insurance policies — and any 
    ```bash
    python -m venv venv
    # Windows:
-   .venv/Scripts/Activate
+   .venv/Scripts/Activate.ps1
    # macOS/Linux:
    source venv/bin/activate
    ```
@@ -126,13 +126,8 @@ alembic upgrade head
 
 ## 🏃 Running the Project
 
-### Option 1 — Interactive CLI (Legacy)
 
-```bash
-python main.py
-```
-
-### Option 2 — FastAPI REST Server (Recommended)
+### Option 1 — FastAPI REST Server (Recommended)
 
 ```bash
 # Step 1: Ingest your dataset
