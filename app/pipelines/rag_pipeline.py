@@ -27,8 +27,7 @@ class RAGPipeline:
         is_greeting = query.lower().strip().strip('?!.') in ["hi", "hello", "hey", "hola", "greetings", "good morning", "good afternoon", "good evening"]
         
         if is_greeting:
-            for token in self.generator.generate_stream(query, [], history_text=history_text):
-                yield token
+            yield "👋 Hello! I'm your AI Document Assistant. How can I help you today? ✨"
             return
 
         # STEP 1: Classification

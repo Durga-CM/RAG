@@ -122,7 +122,7 @@ async def stream_session(session_id: str, request: MessageRequest, db: Session =
                     HistoryService.save_message(db, session_id, "assistant", full_answer)
                     logger.info(f"Stream for {session_id} finalized. Saved history.")
 
-        return StreamingResponse(event_generator(), media_type="text/plain")
+        return StreamingResponse(event_generator(), media_type="text/plain; charset=utf-8")
 
     except Exception as e:
         logger.error(f"Error in stream session {session_id}: {str(e)}")

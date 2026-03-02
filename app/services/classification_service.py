@@ -80,7 +80,7 @@ Analyze the following document text and classify it into ONE category:
         if any(word in query_lower for word in ["medical", "patient", "lab", "hospital"]): categories_found.append("medical")
         if any(word in query_lower for word in ["invoice", "bill", "gst", "payment", "customer", " id ", "id:", "rate"]): categories_found.append("invoice")
         if any(word in query_lower for word in ["hr", "employee", "leave", "salary"]): categories_found.append("hr")
-        if any(word in query_lower for word in ["aws", "amazon"]): categories_found.append("aws_statement")
+        if any(word in query_lower for word in ["aws", "amazon", "statement"]): categories_found.append("aws_statement")
 
         is_aggregate = any(word in query_lower for word in [
             "total", "sum", "exposure", "all", "summary", "everything", 
