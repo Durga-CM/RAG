@@ -24,7 +24,7 @@ class RAGPipeline:
         Hides the 'Source' line and appends metadata at the bottom.
         """
         # NEW: GREETING FILTER FOR STREAM
-        is_greeting = query.lower().strip().strip('?!.') in ["hi", "hello", "hey", "hola", "greetings", "good morning", "good afternoon", "good evening"]
+        is_greeting = query.lower().strip().strip('?!.') in ["hi", "hello", "hey", "hola", "hi there", "greetings", "good morning", "good afternoon", "good evening"]
         
         if is_greeting:
             yield "👋 Hello! I'm your AI Document Assistant. How can I help you today? ✨"
@@ -35,7 +35,25 @@ class RAGPipeline:
         detected_filename = self.classifier.detect_filename_in_query(query)
         
         # STEP 2: Retrieval
-        selected_files_meta = self.retrieval.retrieve(query, detected_doc_type, detected_filename, limit=3)
+        # NEW: Intelligent LLM-based Query Decomposition
+        # This replaces the old hardcoded "who is / what is" split logic.
+        queries_to_process = self.classifier.decompose_query(query)
+
+        all_meta = []
+        is_global_query = detected_doc_type in [None, "cross_category", "general"]
+        fetch_limit = 5 if is_global_query else 3
+
+        for q in queries_to_process:
+            results = self.retrieval.retrieve(q, detected_doc_type, detected_filename, limit=fetch_limit)
+            all_meta.extend(results)
+
+        # De-duplicate files by file_id
+        unique_files = {}
+        for m in all_meta:
+            if m['file_id'] not in unique_files:
+                unique_files[m['file_id']] = m
+        
+        selected_files_meta = list(unique_files.values())
         selected_files_meta.sort(key=lambda x: x['file_name'])
 
         if not selected_files_meta and detected_doc_type != "general":

@@ -15,31 +15,51 @@ class RetrievalService:
         query_vector = self.embedding.embed_query(query)
 
         search_filter = None
-        if doc_type and doc_type != "cross_category":
+        # DYNAMIC DEPTH: If no keyword/category, search much deeper (Global Search)
+        is_global = doc_type is None or doc_type == "cross_category" or doc_type == "general"
+        internal_limit = 50 if is_global else 15
+        
+        if not is_global:
             search_filter = models.Filter(
                 must=[models.FieldCondition(key="doc_type", match=models.MatchValue(value=doc_type))]
             )
 
-        # Standalone step 1: client.query_points with limit 10
+        # Step 1: Query the vector store with dynamic depth
         results = self.vector_store.search(
             COLLECTION_NAME,
             query_vector,
             search_filter,
-            limit=10 
+            limit=internal_limit 
         )
 
         if not results:
             return []
 
+        # Step 2: Lexical Boosting (Literal Search)
+        # If the query contains words that literally exist in the chunk, we boost it.
+        # This fixes the "Deepak Raj" problem where semantic search might be too fuzzy.
+        query_words = [w.lower() for w in query.replace("?", "").split() if len(w) > 2 and w.lower() not in ["who", "is", "the", "and", "what"]]
+        
         # Standalone step 2: Reranking & File Selection (MAX score)
         file_scores = {}
         file_names = {}
         file_types = {}
+        file_has_lexical_match = {} # NEW: Track literal matches
         
         for res in results:
             fid = res.payload['file_id']
             score = res.score
-            
+            text = res.payload.get('text', '').lower()
+
+            # Apply granular lexical boost
+            matches = [w for w in query_words if w in text]
+            if matches:
+                # DYNAMIC BOOST: Higher multiplier for more unique keyword matches
+                # Each match adds 0.5 to the multiplier and 0.5 to the fixed bonus
+                score = (score * (1.5 + 0.5 * len(matches))) + (0.5 * len(matches))
+                file_has_lexical_match[fid] = True
+                # print(f"🚀 Lexical Match for {fid}: '{len(matches)}' words. New Score: {score}")
+
             # CRITICAL FIX: Use MAX score instead of SUM.
             file_scores[fid] = max(file_scores.get(fid, 0), score)
             file_names[fid] = res.payload['file_name']
@@ -55,12 +75,13 @@ class RetrievalService:
         # Standalone step 3: Multi-Document Selection
         sorted_files = sorted(file_scores.items(), key=lambda x: x[1], reverse=True)
         best_score = sorted_files[0][1] if sorted_files else 0
-        threshold = best_score * 0.5
+        threshold = best_score * 0.4 # Slightly more relaxed threshold
         
         selected_files = []
         for fid, score in sorted_files:
-            # Include if score is good enough OR explicitly mentioned
-            if score >= threshold or (detected_filename and detected_filename.lower() in file_names[fid].lower()):
+            # CRITICAL: Always include if there was a lexical/literal match OR score is good enough
+            is_lexical = file_has_lexical_match.get(fid, False)
+            if score >= threshold or is_lexical:
                 selected_files.append({
                     'file_id': fid,
                     'file_name': file_names[fid],

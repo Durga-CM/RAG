@@ -76,11 +76,11 @@ Analyze the following document text and classify it into ONE category:
         # we return None to disable filtering and search EVERYTHING.
         query_lower = query_key
         categories_found = []
-        if any(word in query_lower for word in ["insurance", "premium", "policy"]): categories_found.append("insurance_policy")
-        if any(word in query_lower for word in ["medical", "patient", "lab", "hospital"]): categories_found.append("medical")
-        if any(word in query_lower for word in ["invoice", "bill", "gst", "payment", "customer", " id ", "id:", "rate"]): categories_found.append("invoice")
-        if any(word in query_lower for word in ["hr", "employee", "leave", "salary"]): categories_found.append("hr")
-        if any(word in query_lower for word in ["aws", "amazon", "statement"]): categories_found.append("aws_statement")
+        if any(word in query_lower for word in ["insurance", "premium", "policy", "insurer", "insured", "idv", "registration", "payout"]): categories_found.append("insurance_policy")
+        if any(word in query_lower for word in ["medical", "patient", "lab", "hospital", "diagnosis", "doctor", "prescription", "report date"]): categories_found.append("medical")
+        if any(word in query_lower for word in ["invoice", "bill", "gst", "payment", "customer", " id ", "id:", "rate", "gstin", "supplier", "recipient", "tax invoice"]): categories_found.append("invoice")
+        if any(word in query_lower for word in ["hr", "employee", "leave", "salary", "payroll", "department", "designation"]): categories_found.append("hr")
+        if any(word in query_lower for word in ["aws", "amazon", "statement", "ec2", "s3", "cloud charges"]): categories_found.append("aws_statement")
 
         is_aggregate = any(word in query_lower for word in [
             "total", "sum", "exposure", "all", "summary", "everything", 
@@ -90,7 +90,12 @@ Analyze the following document text and classify it into ONE category:
         # If multiple categories or aggregate keywords found, search everything
         unique_categories = list(set(categories_found))
         
-        if len(unique_categories) > 1:
+        if len(unique_categories) == 0:
+            # If no domain keywords were found at all, this is likely a name or general entity search.
+            # We force 'general' to ensure we search across ALL documents (Global Discovery).
+            # This is critical for finding people like 'Deepak Raj' who are in Invoices, not Medical.
+            result = "general"
+        elif len(unique_categories) > 1:
             result = "cross_category"
         elif len(unique_categories) == 1:
             # Multi-file but single domain (e.g., multiple invoices)
@@ -136,14 +141,14 @@ Classify the following user query into ONE of these categories:
 - hr (employee data, payroll, recruitment, workforce, leave policy, salary, attendance)
 - insurance_policy (insurance policies, premium, IDV, policy number, insurer, coverage, vehicle insurance, policy period, insured name)
 - aws_statement (aws statement, aws billing, aws services, route 53, ec2, cloud costs, cloud hosting)
-- general (if the query doesn't clearly fit any specific category)
+- general (if the query doesn't clearly fit any specific category, or if it is just a question about a person)
 
 USER QUERY: "{query}"
 
 RULES:
 1. Return ONLY the category label (one word: medical, invoice, hr, insurance_policy, aws_statement, or general)
 2. No explanation, no punctuation, just the label
-3. If unsure, return "general"
+3. If the query is just "Who is [Name]?" without other clues, return "general".
 4. CRITICAL: Queries about "premium", "policy number", "IDV", "insurer", "insured", "policy period", "coverage" → ALWAYS insurance_policy
 5. Queries about "GST", "bill", "supplier", "items bought" → invoice
 6. HR is ONLY for non-financial topics like Leave, Attendance, Hiring, or Roles.
@@ -173,6 +178,59 @@ CATEGORY:"""
         except Exception:
             self._cache[query_key] = None
             return None
+
+    def decompose_query(self, query: str) -> list[str]:
+        """
+        🔥 PRODUCTION-GRADE: Uses LLM to intelligently split complex queries.
+        Replaces hardcoded 'if and in query' logic.
+        """
+        # If the query is very short, don't waste time splitting
+        if len(query.split()) < 4 and " and " not in query.lower():
+            return [query]
+
+        decomposition_prompt = f"""You are a query decomposition assistant for a RAG system.
+Your task is to break down a complex user query into a list of simple, focused search terms.
+
+**Rules:**
+1. If the query is simple (e.g., "Who is Parthiban?"), return it as a single-item list.
+2. If the query contains multiple entities or intents (e.g., "Show me invoices for JK Motors and medical reports for Ravi"), split them into clear search queries.
+3. If the user is comparing two things, create a search query for each thing being compared.
+4. Return the result ONLY as a Python-style list of strings.
+5. No explanation, no intro, just the list.
+
+**Example:**
+Query: "Who is Dr. Rajesh and Dr. Meena?"
+Result: ["Who is Dr. Rajesh", "Who is Dr. Meena"]
+
+Query: "Total for JK Motors and GST for Apollo"
+Result: ["Total for JK Motors", "GST for Apollo"]
+
+**User Query:** "{query}"
+
+**Result List:**"""
+
+        try:
+            response = ollama.chat(
+                model=CLASSIFICATION_MODEL,
+                messages=[{"role": "user", "content": decomposition_prompt}]
+            )
+            content = response["message"]["content"].strip()
+            
+            # Basic parsing of the LLM list response
+            if "[" in content and "]" in content:
+                import ast
+                try:
+                    decomposed = ast.literal_eval(content[content.find("["):content.rfind("]")+1])
+                    if isinstance(decomposed, list):
+                        return decomposed
+                except Exception:
+                    pass
+            
+            # Fallback split by lines if list parsing fails
+            lines = [line.strip().strip('"-*• ') for line in content.split('\n') if line.strip()]
+            return lines if lines else [query]
+        except Exception:
+            return [query]
 
     def detect_filename_in_query(self, query: str) -> str | None:
         """
